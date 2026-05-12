@@ -80,8 +80,10 @@ runAssertedStep("1. Omni-Pillar Collection (6+1 Hub)", "v8_step1_omni_hub.js", f
 // PHASE 2: LLM Anti-Hallucination & CN-Filter Intake
 runAssertedStep("2. Strict Entity Intake", "v8_step2_intake.js", fileBus.t1_raw_pool, fileBus.t2_intake);
 
-// PHASE 3: Deep Enrichment, Intent Calc & L3 Deduction
-runAssertedStep("3. L3 Deduction & Intent Scoring", "v8_step3_ultimate_enrichment.js", fileBus.t2_intake, fileBus.t3_enriched);
+// PHASE 3: L3 Supply-Chain Inference + Contact Extraction
+// Gemini infers entity_role, BOM (primary_materials_top3), procurement_items, confidence_tier,
+// intent_summary — stored as inference_breakdown (written to data_intel_l3_inferred by Step5→API).
+runAssertedStep("3. L3 Supply-Chain Inference & Contact Extraction", "v8_step3_ultimate_enrichment.js", fileBus.t2_intake, fileBus.t3_enriched);
 
 // PHASE 4: Global Dedupe & Schema Normalization
 runAssertedStep("4. Global Dedupe", "v8_step4_dedupe.js", fileBus.t3_enriched, fileBus.t4_deduped, `"${countryCode}"`);

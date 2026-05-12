@@ -61,15 +61,17 @@ leads.forEach(lead => {
 // ── Catagent API Push (BulkL1Item format) ───────────────────────────────────
 function mapToBulkL1Item(lead) {
     return {
-        name:          lead.company_name || '',
-        country:       lead.country      || '',
-        domain:        lead.domain       || undefined,
-        primary_email: lead.primary_email || undefined,
-        primary_phone: lead.primary_phone || undefined,
-        categories:    lead.inferred_bom  || undefined,
-        place_type:    lead.entity_role   || undefined,
+        name:                 lead.company_name || '',
+        country:              lead.country      || '',
+        domain:               lead.domain       || undefined,
+        primary_email:        lead.primary_email || undefined,
+        primary_phone:        lead.primary_phone || undefined,
+        categories:           lead.inferred_bom  || undefined,
+        place_type:           lead.entity_role   || undefined,
         // snippet used as address hint when no structured address available
-        address_line:  lead.snippet?.slice(0, 200) || undefined,
+        address_line:         lead.snippet?.slice(0, 200) || undefined,
+        // L3 supply-chain inference (written to data_intel_l3_inferred by the bulk API)
+        inference_breakdown:  lead.inference_breakdown || undefined,
     };
 }
 
