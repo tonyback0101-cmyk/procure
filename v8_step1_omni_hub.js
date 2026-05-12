@@ -99,20 +99,60 @@ async function run() {
         console.warn(`[step1] Pillar 3 failed (non-fatal): ${e.message}`);
     }
 
-    // Pillar 4: Social
-    console.log(`[step1] Pillar 4: Social...`);
-    const social = await searchOrganic(`${baseQuery} "${countryName}" site:linkedin.com/company OR site:facebook.com/groups`, countryCode);
-    social.forEach(o => allLeads.push({ title: o.title, link: o.link, snippet: o.snippet, pillar: 'Pillar 4 Social' }));
+    // Pillar 4: Deep Social — 5路并发意图词探针
+    console.log(`[step1] Pillar 4: Deep Social Penetration...`);
+    const [socialGeneral, socialFbGroups, socialLinkedIn, socialWhatsApp, socialThreads] = await Promise.all([
+        // ① 通用公司主页（保留原逻辑）
+        searchOrganic(`${baseQuery} "${countryName}" site:linkedin.com/company OR site:facebook.com/groups`, countryCode),
+        // ② Facebook Groups 主动采购意图
+        searchOrganic(`"${category}" ("need supplier" OR "sourcing" OR "looking for supplier" OR "buying" OR "RFQ") site:facebook.com/groups "${countryName}"`, countryCode),
+        // ③ LinkedIn 采购个人/企业
+        searchOrganic(`"${category}" ("procurement manager" OR "sourcing manager" OR "purchasing" OR "import") site:linkedin.com/in "${countryName}"`, countryCode),
+        // ④ WhatsApp 商业群/联系
+        searchOrganic(`"${category}" ("whatsapp group" OR "wa.me" OR "whatsapp business") "${countryName}" buyer OR importer`, countryCode),
+        // ⑤ Threads/Instagram 采购意图
+        searchOrganic(`"${category}" ("looking for supplier" OR "where to buy" OR "need" OR "sourcing") "${countryName}" (site:threads.net OR site:instagram.com)`, countryCode),
+    ]);
+    socialGeneral.forEach(o => allLeads.push({ title: o.title, link: o.link, snippet: o.snippet, pillar: 'Pillar 4 Social General' }));
+    socialFbGroups.forEach(o => allLeads.push({ title: o.title, link: o.link, snippet: o.snippet, pillar: 'Pillar 4 Social FB-Intent', intent_signal: 'ACTIVE_SOURCING' }));
+    socialLinkedIn.forEach(o => allLeads.push({ title: o.title, link: o.link, snippet: o.snippet, pillar: 'Pillar 4 Social LinkedIn-Intent', intent_signal: 'PROCUREMENT_ROLE' }));
+    socialWhatsApp.forEach(o => allLeads.push({ title: o.title, link: o.link, snippet: o.snippet, pillar: 'Pillar 4 Social WhatsApp', intent_signal: 'WHATSAPP_CONTACT' }));
+    socialThreads.forEach(o => allLeads.push({ title: o.title, link: o.link, snippet: o.snippet, pillar: 'Pillar 4 Social Threads', intent_signal: 'ACTIVE_SOURCING' }));
+    console.log(`[step1] Pillar 4 total: ${socialGeneral.length + socialFbGroups.length + socialLinkedIn.length + socialWhatsApp.length + socialThreads.length} signals`);
 
-    // Pillar 5: Tenders & Procurement
-    console.log(`[step1] Pillar 5: Tenders & Procurement...`);
+    // Pillar 5a: Tenders & Procurement（政府招标）
+    console.log(`[step1] Pillar 5a: Tenders & Procurement...`);
     const tenders = await searchOrganic(`"${category}" (tender OR RFP OR "request for proposal" OR procurement) ${tld} OR site:.gov.${countryCode}`, countryCode);
-    tenders.forEach(o => allLeads.push({ title: o.title, link: o.link, snippet: o.snippet, pillar: 'Pillar 5 Tenders' }));
+    tenders.forEach(o => allLeads.push({ title: o.title, link: o.link, snippet: o.snippet, pillar: 'Pillar 5a Tenders', intent_signal: 'TENDER_ISSUER' }));
+
+    // Pillar 5b: Compliance Registries（认证申请库 — 正在生产/采购的前端信号）
+    // 申请 FCC/TUV/CE/UL 认证 = 确认该公司正在制造或采购该品类产品
+    console.log(`[step1] Pillar 5b: Compliance Registries...`);
+    try {
+        const compliance = await searchOrganic(
+            `"${category}" ("Applicant" OR "Grantee" OR "certificate holder" OR "registered manufacturer") (site:fccid.io OR site:tuv.com OR site:ul.com OR site:ce-check.eu OR site:intertek.com)`,
+            countryCode
+        );
+        compliance.forEach(o => allLeads.push({
+            title:         o.title,
+            link:          o.link,
+            snippet:       o.snippet,
+            pillar:        'Pillar 5b Compliance',
+            intent_signal: 'COMPLIANCE_REGISTRANT',
+        }));
+        console.log(`[step1] Pillar 5b: ${compliance.length} compliance signals found.`);
+    } catch (e) {
+        console.warn(`[step1] Pillar 5b failed (non-fatal): ${e.message}`);
+    }
 
     // Pillar 6: Exhibitions
     console.log(`[step1] Pillar 6: Exhibitions...`);
     const exhibitions = await searchOrganic(`"${category}" ("exhibitor list" OR "exhibitors directory") ${currentYear} "${countryName}"`, countryCode);
     exhibitions.forEach(o => allLeads.push({ title: o.title, link: o.link, snippet: o.snippet, pillar: 'Pillar 6 Exhibitions' }));
+
+    // 统一注入 source_timestamp，供 Step5 时间衰减使用
+    const nowIso = new Date().toISOString();
+    allLeads.forEach(l => { l.source_timestamp = l.source_timestamp || nowIso; });
 
     fs.writeFileSync(outputFile, JSON.stringify(allLeads, null, 2));
     console.log(`[step1] Done — ${allLeads.length} raw leads written → ${outputFile}`);

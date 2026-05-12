@@ -88,16 +88,53 @@ Input: ${JSON.stringify(batch.map(l => ({ name: l.company_name, snip: l.snippet 
     return leads;
 }
 
+// ?? Email cleaner: strip fake/exhibition/platform addresses ?????????????????
+const EMAIL_DOMAIN_BLACKLIST = new Set([
+    // Exhibition organizers
+    'messefrankfurt.com','cantonfair.org.cn','globalsources.com','alibaba.com',
+    'amazon.com','aliexpress.com','made-in-china.com','thomasnet.com',
+    'indiamart.com','tradefair.com','messe.de','koelnmesse.de','reed.co.uk',
+    // Generic invalid
+    'example.com','test.com','domain.com','email.com','mail.com','tempmail.com',
+]);
+const EMAIL_ROLE_PREFIXES = new Set([
+    'noreply','no-reply','donotreply','do-not-reply','webmaster','postmaster',
+    'mailer-daemon','bounce','unsubscribe','admin','support','info',
+]);
+
+function cleanEmail(raw) {
+    if (!raw) return null;
+    const em = raw.toLowerCase().trim();
+    if (!em.includes('@')) return null;
+    const [local, domain] = em.split('@');
+    if (!domain) return null;
+    // Reject image/asset false positives
+    if (/\.(png|jpg|jpeg|gif|svg|webp|pdf|css|js)$/i.test(em)) return null;
+    // Reject blacklisted domains
+    if (EMAIL_DOMAIN_BLACKLIST.has(domain)) {
+        console.log(`[step3] ? Stripped exhibition/platform email: ${em}`);
+        return null;
+    }
+    // Reject role-based addresses that are never real contacts
+    const prefix = local.split('+')[0].split('.')[0];
+    if (EMAIL_ROLE_PREFIXES.has(prefix)) return null;
+    return em;
+}
+
 const extractFromHTML = (html, emails, phones) => {
     const $ = cheerio.load(html);
-    $('a[href^="mailto:"]').each((_, el) => emails.add($(el).attr('href').replace('mailto:', '').split('?')[0].trim()));
+    $('a[href^="mailto:"]').each((_, el) => {
+        const raw = $(el).attr('href').replace('mailto:', '').split('?')[0].trim();
+        const clean = cleanEmail(raw);
+        if (clean) emails.add(clean);
+    });
     $('a[href^="tel:"]').each((_, el) => phones.add($(el).attr('href').replace('tel:', '').trim()));
     $('a[href*="wa.me/"]').each((_, el) => phones.add($(el).attr('href')));
     const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z]{2,})/g;
     let match;
     while ((match = emailRegex.exec($('body').text())) !== null) {
-        const em = match[1].toLowerCase();
-        if (!em.endsWith('.png') && !em.endsWith('.jpg') && !em.endsWith('.jpeg')) emails.add(em);
+        const clean = cleanEmail(match[1]);
+        if (clean) emails.add(clean);
     }
 };
 

@@ -75,6 +75,13 @@ leads.forEach(lead => {
     const budget = estimateProcurementBudget(lead, budgetKnowledge);
     if (budget) lead.estimated_procurement_budget_usd = budget;
 
+    // Apply temporal decay to confidence_score
+    const decayPenalty = applyTemporalDecay(lead);
+    if (decayPenalty > 0) {
+        lead.confidence_score = Math.max((lead.confidence_score || 50) - decayPenalty, 1);
+        lead.decay_penalty    = decayPenalty;
+    }
+
     const hasContact = !!(lead.primary_email || lead.primary_phone);
     const isHot      = lead.confidence_score >= 90 && hasContact;
 
@@ -89,6 +96,38 @@ leads.forEach(lead => {
         }
     }
 });
+
+// ── Temporal Decay Factor ────────────────────────────────────────────────────
+// Pillar 时间半衰期（天）：数字越小衰减越快
+const PILLAR_HALF_LIFE_DAYS = {
+    'Pillar 0 Seed':                60,   // 种子库相对稳定
+    'Pillar 1 Maps':                30,
+    'Pillar 2 B2B':                 21,
+    'Pillar 3 Customs/ImportYeti':  45,
+    'Pillar 3 Customs/Volza':       45,
+    'Pillar 3 Customs/BoL':         45,
+    'Pillar 4 Social General':      14,
+    'Pillar 4 Social FB-Intent':     7,   // 实时采购意图，衰减最快
+    'Pillar 4 Social LinkedIn-Intent': 14,
+    'Pillar 4 Social WhatsApp':      7,
+    'Pillar 4 Social Threads':       7,
+    'Pillar 5a Tenders':            14,
+    'Pillar 5b Compliance':         90,   // 认证申请记录较持久
+    'Pillar 6 Exhibitions':         30,
+};
+const DEFAULT_HALF_LIFE_DAYS = 21;
+const MAX_DECAY_PENALTY      = 30;  // 最大扣分上限，防止过度惩罚
+
+function applyTemporalDecay(lead) {
+    if (!lead.source_timestamp) return 0;
+    const ageMs      = Date.now() - new Date(lead.source_timestamp).getTime();
+    const ageDays    = ageMs / (1000 * 60 * 60 * 24);
+    const halfLife   = PILLAR_HALF_LIFE_DAYS[lead.pillar] || DEFAULT_HALF_LIFE_DAYS;
+    // 指数衰减公式：decay = score * (1 - 2^(-age/halfLife))
+    const decayRatio = 1 - Math.pow(2, -ageDays / halfLife);
+    const penalty    = Math.round(Math.min((lead.confidence_score || 50) * decayRatio, MAX_DECAY_PENALTY));
+    return penalty;
+}
 
 // ── Catagent API Push (BulkL1Item format) ───────────────────────────────────
 function mapToBulkL1Item(lead) {
@@ -105,6 +144,10 @@ function mapToBulkL1Item(lead) {
         ...(lead.estimated_procurement_budget_usd != null && {
             quantity_hint: `est_budget_usd:${lead.estimated_procurement_budget_usd}`,
         }),
+        // Provenance metadata
+        ...(lead.source_timestamp && { source_timestamp: lead.source_timestamp }),
+        ...(lead.decay_penalty    && { decay_penalty:    lead.decay_penalty }),
+        ...(lead.intent_signal    && { intent_signal:    lead.intent_signal }),
     };
 }
 
