@@ -4,13 +4,13 @@
   "description": "Zhimao V8 Ultimate Omni-Matrix — multi-pillar B2B buyer discovery pipeline",
   "main": "zhimao_v8_ultimate_master.js",
   "scripts": {
-    "loop":   "node v8_infinite_loop.js",
-    "cron":   "node v8_cron_worker.js",
-    "run":    "node zhimao_v8_ultimate_master.js",
-    "worker": "node v8_discovery_worker.js"
+    "loop":          "node v8_infinite_loop.js",
+    "cron":          "node v8_cron_worker.js",
+    "run":           "node zhimao_v8_ultimate_master.js",
+    "build:knowledge":       "node v8_knowledge_builder.js",
+    "build:knowledge:force": "node v8_knowledge_builder.js --force"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.50.3",
     "axios":          "^1.16.0",
     "better-sqlite3": "^12.9.0",
     "cheerio":        "^1.2.0",

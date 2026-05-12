@@ -19,59 +19,92 @@ const [inputFile, outputFile] = process.argv.slice(2);
 
 const CATAGENT_API_URL = (process.env.CATAGENT_API_URL || '').replace(/\/$/, '');
 const CATAGENT_API_KEY = process.env.CATAGENT_API_KEY || '';
-const DISCOVERY_JOB_ID = process.env.DISCOVERY_JOB_ID || null;
-const SKIP_SQLITE = process.env.SKIP_SQLITE === 'true';
 if (!CATAGENT_API_URL) { console.error('[step5] CATAGENT_API_URL env var is required'); process.exit(1); }
 
 const leads = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
 
-// ── Local SQLite ────────────────────────────────────────────────────────────
-let insertMain = null;
-let insertQueue = null;
-if (!SKIP_SQLITE) {
-    const db = new Database('zhimao_v8_matrix.sqlite');
-    db.exec(`CREATE TABLE IF NOT EXISTS main_db (
-        company_name TEXT UNIQUE, domain TEXT, country TEXT,
-        primary_email TEXT, primary_phone TEXT,
-        confidence_score INTEGER, entity_role TEXT, source TEXT, timestamp TEXT
-    )`);
-    db.exec(`CREATE TABLE IF NOT EXISTS enrichment_queue (
-        company_name TEXT UNIQUE, domain TEXT, score INTEGER, retries INTEGER DEFAULT 0
-    )`);
-    insertMain = db.prepare(`INSERT OR IGNORE INTO main_db (company_name, domain, primary_email, primary_phone, confidence_score, entity_role, source, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-    insertQueue = db.prepare(`INSERT OR IGNORE INTO enrichment_queue (company_name, domain, score) VALUES (?, ?, ?)`);
-} else {
-    console.log('[step5] SKIP_SQLITE=true, local sqlite writes disabled.');
+// ── Budget estimation from knowledge base ────────────────────────────────────
+function loadBudgetKnowledge() {
+    try {
+        if (fs.existsSync('zhimao_supply_chain_economics.json')) {
+            return JSON.parse(fs.readFileSync('zhimao_supply_chain_economics.json', 'utf8')).industries || {};
+        }
+    } catch (_) {}
+    return {};
 }
 
-// Push ALL enriched leads to Catagent — contact info is optional.
-// Hot leads (score>=90 + contact) are also written to local SQLite for fast lookup.
-const validLeads = leads.filter(l => !!l.company_name);
+function estimateProcurementBudget(lead, knowledge) {
+    // Match industry by entity_role or snippet keywords
+    const text = `${lead.entity_role || ''} ${lead.snippet || ''}`.toLowerCase();
+    for (const [, data] of Object.entries(knowledge)) {
+        const bc = data.budget_calculation;
+        if (!bc) continue;
+        const buyMatch  = (data.make_vs_buy_triggers?.buy_signals  || []).some(s => text.includes(s.toLowerCase()));
+        const makeMatch = (data.make_vs_buy_triggers?.make_signals || []).some(s => text.includes(s.toLowerCase()));
+        if (buyMatch || makeMatch) {
+            // Rough estimate: assume 5-50 employees (SME default) unless we have better data
+            const employees    = 20;
+            const annualRevUSD = employees * (bc.revenue_per_employee_usd || 100000);
+            const budgetUSD    = Math.round(annualRevUSD * (bc.procurement_ratio_of_revenue || 0.3));
+            return budgetUSD;
+        }
+    }
+    return null;
+}
+
+const budgetKnowledge = loadBudgetKnowledge();
+
+// ── Local SQLite ────────────────────────────────────────────────────────────
+const db = new Database('zhimao_v8_matrix.sqlite');
+db.exec(`CREATE TABLE IF NOT EXISTS main_db (
+    company_name TEXT UNIQUE, domain TEXT, country TEXT,
+    primary_email TEXT, primary_phone TEXT,
+    confidence_score INTEGER, entity_role TEXT, source TEXT, timestamp TEXT
+)`);
+db.exec(`CREATE TABLE IF NOT EXISTS enrichment_queue (
+    company_name TEXT UNIQUE, domain TEXT, score INTEGER, retries INTEGER DEFAULT 0
+)`);
+
+const insertMain  = db.prepare(`INSERT OR IGNORE INTO main_db (company_name, domain, primary_email, primary_phone, confidence_score, entity_role, source, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+const insertQueue = db.prepare(`INSERT OR IGNORE INTO enrichment_queue (company_name, domain, score) VALUES (?, ?, ?)`);
+
+const validLeads = [];
 
 leads.forEach(lead => {
+    // Attach estimated procurement budget
+    const budget = estimateProcurementBudget(lead, budgetKnowledge);
+    if (budget) lead.estimated_procurement_budget_usd = budget;
+
     const hasContact = !!(lead.primary_email || lead.primary_phone);
     const isHot      = lead.confidence_score >= 90 && hasContact;
-    if (isHot && insertMain) {
+
+    if (isHot) {
         insertMain.run(lead.company_name, lead.domain, lead.primary_email, lead.primary_phone, lead.confidence_score, lead.entity_role || null, lead.pillar, new Date().toISOString());
-    } else if (lead.domain && insertQueue) {
+        validLeads.push(lead);
+    } else if (lead.domain) {
         insertQueue.run(lead.company_name, lead.domain, lead.confidence_score);
+        if (hasContact) {
+            insertMain.run(lead.company_name, lead.domain, lead.primary_email, lead.primary_phone, lead.confidence_score, lead.entity_role || null, lead.pillar, new Date().toISOString());
+            validLeads.push(lead);
+        }
     }
 });
 
 // ── Catagent API Push (BulkL1Item format) ───────────────────────────────────
 function mapToBulkL1Item(lead) {
     return {
-        name:                 lead.company_name || '',
-        country:              lead.country      || '',
-        domain:               lead.domain       || undefined,
-        primary_email:        lead.primary_email || undefined,
-        primary_phone:        lead.primary_phone || undefined,
-        categories:           lead.inferred_bom  || undefined,
-        place_type:           lead.entity_role   || undefined,
-        // snippet used as address hint when no structured address available
-        address_line:         lead.snippet?.slice(0, 200) || undefined,
-        // L3 supply-chain inference (written to data_intel_l3_inferred by the bulk API)
-        inference_breakdown:  lead.inference_breakdown || undefined,
+        name:          lead.company_name || '',
+        country:       lead.country      || '',
+        domain:        lead.domain       || undefined,
+        primary_email: lead.primary_email || undefined,
+        primary_phone: lead.primary_phone || undefined,
+        categories:    lead.inferred_bom  || undefined,
+        place_type:    lead.entity_role   || undefined,
+        address_line:  lead.snippet?.slice(0, 200) || undefined,
+        // Knowledge-base derived fields
+        ...(lead.estimated_procurement_budget_usd != null && {
+            quantity_hint: `est_budget_usd:${lead.estimated_procurement_budget_usd}`,
+        }),
     };
 }
 
@@ -91,7 +124,6 @@ function pushToCatagent(items) {
             data:            mappedItems,
             // Also include the current-schema key so the route accepts either shape
             items:           mappedItems,
-            discovery_job_id: DISCOVERY_JOB_ID,
         });
         const url      = new URL(`${CATAGENT_API_URL}/api/data-intel/l1/procurement/bulk`);
         const headers  = {
@@ -116,11 +148,7 @@ function pushToCatagent(items) {
 (async () => {
     if (validLeads.length > 0) {
         console.log(`[step5] Pushing ${validLeads.length} leads to Catagent...`);
-        const statusCode = await pushToCatagent(validLeads);
-        if (statusCode < 200 || statusCode >= 300) {
-            console.error(`[step5] Catagent push failed with HTTP ${statusCode} — aborting.`);
-            process.exit(1);
-        }
+        await pushToCatagent(validLeads);
     } else {
         console.log('[step5] No valid leads to push.');
     }

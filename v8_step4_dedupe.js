@@ -1,5 +1,5 @@
 const fs = require('fs');
-const [inputFile, outputFile, countryArg] = process.argv.slice(2);
+const [inputFile, outputFile, , countryArg] = process.argv.slice(2);
 
 const leads   = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
 const country = countryArg || 'Unknown';
