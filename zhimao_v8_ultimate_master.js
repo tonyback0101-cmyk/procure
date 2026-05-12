@@ -16,6 +16,14 @@ const category = args.slice(1).join(' ');
 const sessionId = `v8_ultimate_${countryCode}_${Date.now()}`;
 fs.mkdirSync(sessionId, { recursive: true });
 
+// 每次任务前触发品类自动扩充（非致命）
+try {
+    execSync('node cron_taxonomy_expander.js', { stdio: 'pipe' });
+    console.log('[V8 Master] Taxonomy auto-expansion: OK');
+} catch (e) {
+    console.warn('[V8 Master] Taxonomy expander skipped (non-fatal):', e.message?.slice(0, 80));
+}
+
 function runAssertedStep(stepName, scriptFile, inputFiles, outputFile, extraArgs = "") {
     console.log(`\n>>> [STEP: ${stepName}] <<<`);
 

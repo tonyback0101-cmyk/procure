@@ -161,7 +161,365 @@
         "importer",
         "buyer"
       ]
+    },
+    "Packaging & Printing": {
+      "status": "active",
+      "subcategories": [
+        "Corrugated Shipping Boxes",
+        "Stand Up Pouches",
+        "Kraft Paper Bags",
+        "Adhesive Sticker Labels",
+        "Rigid Gift Boxes",
+        "Cosmetic Glass Bottles",
+        "Poly Mailers",
+        "Thermal Paper Rolls",
+        "Eco-friendly Mailers",
+        "Corrugated Boxes",
+        "Flexible Pouches",
+        "Label Printers"
+      ],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Beauty & Personal Care": {
+      "status": "active",
+      "subcategories": [
+        "False Eyelashes",
+        "Makeup Brush Sets",
+        "UV Gel Nail Polish",
+        "Gua Sha Massage Tools",
+        "Human Hair Extensions",
+        "Empty Cosmetic Packaging",
+        "LED Beauty Masks",
+        "Makeup Sponges"
+      ],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Furniture & Home Decor": {
+      "status": "active",
+      "subcategories": [
+        "Sectional Sofas",
+        "Ergonomic Office Chairs",
+        "Rattan Patio Furniture Sets",
+        "LED Pendant Lights",
+        "Wooden Bed Frames",
+        "Blackout Window Curtains",
+        "LED Vanity Mirrors",
+        "Tufted Area Rugs"
+      ],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Sporting Goods": {
+      "status": "active",
+      "subcategories": [
+        "Yoga Mats",
+        "Adjustable Dumbbells",
+        "Resistance Bands",
+        "Pickleball Paddles",
+        "Inflatable Paddle Boards",
+        "Boxing Gloves",
+        "Motorized Treadmills",
+        "Fitness Trampolines"
+      ],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Toys & Hobbies": {
+      "status": "active",
+      "subcategories": [
+        "RC Quadcopter Drones",
+        "Magnetic Building Blocks",
+        "Electric Ride-On Cars",
+        "Wooden Montessori Toys",
+        "Diecast Model Cars",
+        "Silicone Pop Fidget Toys",
+        "Inflatable Bouncing Castles",
+        "Custom Plush Toys"
+      ],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Electrical Equipment": {
+      "status": "active",
+      "subcategories": [
+        "Miniature Circuit Breakers",
+        "Variable Frequency Drives",
+        "Power Inverters",
+        "Magnetic Contactors",
+        "Solid State Relays",
+        "Surge Protective Devices",
+        "Distribution Transformers",
+        "Brushless DC Motors"
+      ],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Hardware & Tools": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Metals & Alloys": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Plastics & Rubber": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Security & Protection": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Telecommunications": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Lighting": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Office & School Supplies": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Shoes & Accessories": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Luggage & Bags": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Gifts & Crafts": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Pet Supplies": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Mother & Baby": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Energy Storage": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
+    },
+    "Water Treatment": {
+      "status": "active",
+      "subcategories": [],
+      "b2b_intent_modifiers": [
+        "wholesale",
+        "distributor",
+        "importer",
+        "supplier",
+        "B2B",
+        "procurement",
+        "manufacturer"
+      ],
+      "last_swept": null,
+      "total_leads_generated": 0
     }
   },
-  "last_updated": "2026-04-21T13:29:32.992Z"
+  "last_updated": "2026-05-12T16:20:28.691Z"
 }
