@@ -209,6 +209,20 @@ async function run() {
             score = Math.min(score, 85);
         }
         l.confidence_score = Math.min(score, 100);
+
+        // ── final_intent_score: confidence_score + intent/pillar quality bonuses ──
+        let intentScore = l.confidence_score;
+        // Intent signal boosts (set by Step 1 Pillar 4/5 probes)
+        if      (l.intent_signal === 'ACTIVE_SOURCING')       intentScore += 10;
+        else if (l.intent_signal === 'PROCUREMENT_ROLE')      intentScore += 8;
+        else if (l.intent_signal === 'WHATSAPP_CONTACT')      intentScore += 7;
+        else if (l.intent_signal === 'COMPLIANCE_REGISTRANT') intentScore += 5;
+        // High-trust pillar bonus
+        if (l.pillar?.includes('Customs') || l.pillar?.includes('B2B'))  intentScore += 5;
+        // Rich BOM deduction indicates verified manufacturer
+        if (Array.isArray(l.inferred_bom) && l.inferred_bom.length >= 3) intentScore += 5;
+        l.final_intent_score = Math.min(intentScore, 100);
+
         enriched.push(l);
     }
 

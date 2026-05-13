@@ -1,13 +1,13 @@
 /**
- * Step 5 — Routing & Persistence Gateway
+ * Step 5 ??? Routing & Persistence Gateway
  *
  * 1. Writes hot leads (score >= 90 with contact) to local SQLite main_db
  * 2. Queues lower-score leads for future enrichment
  * 3. Pushes all leads with contact info to the Catagent API (BulkL1Item format)
  *
  * Required env vars:
- *   CATAGENT_API_URL   — e.g. https://catagent.vercel.app
- *   CATAGENT_API_KEY   — internal API key / CRON_SECRET
+ *   CATAGENT_API_URL   ??? e.g. https://catagent.vercel.app
+ *   CATAGENT_API_KEY   ??? internal API key / CRON_SECRET
  */
 require('dotenv').config();
 const fs       = require('fs');
@@ -23,7 +23,7 @@ if (!CATAGENT_API_URL) { console.error('[step5] CATAGENT_API_URL env var is requ
 
 const leads = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
 
-// ── Budget estimation from knowledge base ────────────────────────────────────
+// ?????? Budget estimation from knowledge base ????????????????????????????????????????????????????????????????????????????????????????????????????????????
 function loadBudgetKnowledge() {
     try {
         if (fs.existsSync('zhimao_supply_chain_economics.json')) {
@@ -54,7 +54,7 @@ function estimateProcurementBudget(lead, knowledge) {
 
 const budgetKnowledge = loadBudgetKnowledge();
 
-// ── Local SQLite ────────────────────────────────────────────────────────────
+// ?????? Local SQLite ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
 const db = new Database('zhimao_v8_matrix.sqlite');
 db.exec(`CREATE TABLE IF NOT EXISTS main_db (
     company_name TEXT UNIQUE, domain TEXT, country TEXT,
@@ -75,61 +75,68 @@ leads.forEach(lead => {
     const budget = estimateProcurementBudget(lead, budgetKnowledge);
     if (budget) lead.estimated_procurement_budget_usd = budget;
 
-    // Apply temporal decay to confidence_score
+    // Apply temporal decay ? propagate to both score fields
     const decayPenalty = applyTemporalDecay(lead);
     if (decayPenalty > 0) {
-        lead.confidence_score = Math.max((lead.confidence_score || 50) - decayPenalty, 1);
-        lead.decay_penalty    = decayPenalty;
+        lead.confidence_score    = Math.max((lead.confidence_score    || 50) - decayPenalty, 1);
+        if (lead.final_intent_score != null)
+            lead.final_intent_score = Math.max(lead.final_intent_score - decayPenalty, 1);
+        lead.decay_penalty = decayPenalty;
     }
 
+    // Canonical routing score: final_intent_score (set by Step 3) ? confidence_score fallback
+    const score      = lead.final_intent_score ?? lead.confidence_score ?? 50;
     const hasContact = !!(lead.primary_email || lead.primary_phone);
-    const isHot      = lead.confidence_score >= 90 && hasContact;
+    const nowIso     = new Date().toISOString();
 
-    if (isHot) {
-        insertMain.run(lead.company_name, lead.domain, lead.primary_email, lead.primary_phone, lead.confidence_score, lead.entity_role || null, lead.pillar, new Date().toISOString());
+    // Tier 1 ? Hot (?90 + contact): Ops ?? + Catagent
+    if (score >= 90 && hasContact) {
+        insertMain.run(lead.company_name, lead.domain, lead.primary_email, lead.primary_phone, score, lead.entity_role || null, lead.pillar, nowIso);
         validLeads.push(lead);
+    // Tier 2 ? Warm (?60): ?? ? Catagent; ????????? main_db
+    } else if (score >= 60) {
+        validLeads.push(lead);
+        if (lead.domain) insertQueue.run(lead.company_name, lead.domain, score);
+        if (hasContact)  insertMain.run(lead.company_name, lead.domain, lead.primary_email, lead.primary_phone, score, lead.entity_role || null, lead.pillar, nowIso);
+    // Tier 3 ? Cold (<60): ???????
     } else if (lead.domain) {
-        insertQueue.run(lead.company_name, lead.domain, lead.confidence_score);
-        if (hasContact) {
-            insertMain.run(lead.company_name, lead.domain, lead.primary_email, lead.primary_phone, lead.confidence_score, lead.entity_role || null, lead.pillar, new Date().toISOString());
-            validLeads.push(lead);
-        }
+        insertQueue.run(lead.company_name, lead.domain, score);
     }
 });
 
-// ── Temporal Decay Factor ────────────────────────────────────────────────────
-// Pillar 时间半衰期（天）：数字越小衰减越快
+// ?????? Temporal Decay Factor ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
+// Pillar ??????????????????????????????????
 const PILLAR_HALF_LIFE_DAYS = {
-    'Pillar 0 Seed':                60,   // 种子库相对稳定
+    'Pillar 0 Seed':                60,   // ???????????
     'Pillar 1 Maps':                30,
     'Pillar 2 B2B':                 21,
     'Pillar 3 Customs/ImportYeti':  45,
     'Pillar 3 Customs/Volza':       45,
     'Pillar 3 Customs/BoL':         45,
     'Pillar 4 Social General':      14,
-    'Pillar 4 Social FB-Intent':     7,   // 实时采购意图，衰减最快
+    'Pillar 4 Social FB-Intent':     7,   // ?????????????????????????
     'Pillar 4 Social LinkedIn-Intent': 14,
     'Pillar 4 Social WhatsApp':      7,
     'Pillar 4 Social Threads':       7,
     'Pillar 5a Tenders':            14,
-    'Pillar 5b Compliance':         90,   // 认证申请记录较持久
+    'Pillar 5b Compliance':         90,   // ????????????????
     'Pillar 6 Exhibitions':         30,
 };
 const DEFAULT_HALF_LIFE_DAYS = 21;
-const MAX_DECAY_PENALTY      = 30;  // 最大扣分上限，防止过度惩罚
+const MAX_DECAY_PENALTY      = 30;  // ?????????????????????????????
 
 function applyTemporalDecay(lead) {
     if (!lead.source_timestamp) return 0;
     const ageMs      = Date.now() - new Date(lead.source_timestamp).getTime();
     const ageDays    = ageMs / (1000 * 60 * 60 * 24);
     const halfLife   = PILLAR_HALF_LIFE_DAYS[lead.pillar] || DEFAULT_HALF_LIFE_DAYS;
-    // 指数衰减公式：decay = score * (1 - 2^(-age/halfLife))
+    // ????????????????decay = score * (1 - 2^(-age/halfLife))
     const decayRatio = 1 - Math.pow(2, -ageDays / halfLife);
     const penalty    = Math.round(Math.min((lead.confidence_score || 50) * decayRatio, MAX_DECAY_PENALTY));
     return penalty;
 }
 
-// ── Catagent API Push (BulkL1Item format) ───────────────────────────────────
+// ?????? Catagent API Push (BulkL1Item format) ?????????????????????????????????????????????????????????????????????????????????????????????????????????
 function mapToBulkL1Item(lead) {
     return {
         name:          lead.company_name || '',
@@ -144,10 +151,11 @@ function mapToBulkL1Item(lead) {
         ...(lead.estimated_procurement_budget_usd != null && {
             quantity_hint: `est_budget_usd:${lead.estimated_procurement_budget_usd}`,
         }),
-        // Provenance metadata
-        ...(lead.source_timestamp && { source_timestamp: lead.source_timestamp }),
-        ...(lead.decay_penalty    && { decay_penalty:    lead.decay_penalty }),
-        ...(lead.intent_signal    && { intent_signal:    lead.intent_signal }),
+        // Scoring & provenance metadata
+        ...(lead.final_intent_score != null && { final_intent_score: lead.final_intent_score }),
+        ...(lead.source_timestamp           && { source_timestamp:   lead.source_timestamp }),
+        ...(lead.decay_penalty              && { decay_penalty:      lead.decay_penalty }),
+        ...(lead.intent_signal              && { intent_signal:      lead.intent_signal }),
     };
 }
 
@@ -196,5 +204,5 @@ function pushToCatagent(items) {
         console.log('[step5] No valid leads to push.');
     }
     fs.writeFileSync(outputFile, JSON.stringify({ status: 'success', db_injected: validLeads.length }, null, 2));
-    console.log(`[step5] Done → ${outputFile}`);
+    console.log(`[step5] Done ??? ${outputFile}`);
 })();
