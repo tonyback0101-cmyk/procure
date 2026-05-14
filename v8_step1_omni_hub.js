@@ -1,11 +1,23 @@
 require('dotenv').config();
 const fs    = require('fs');
 const https = require('https');
+const { isJunkDomain } = require('./v8_quality_gate');
 
 const [inputFile, outputFile, countryCode] = process.argv.slice(2);
 
 const API_KEY = process.env.SERPER_API_KEY;
 if (!API_KEY) { console.error('[step1] SERPER_API_KEY env var is required'); process.exit(1); }
+
+// Deep paging: sweep N → page N (results 1-20, 21-40, … 81-100)
+// Same [category × country] grid mines new data each cron run
+const SWEEP_COUNT = Math.max(1, parseInt(process.env.SWEEP_COUNT || '1', 10));
+const SEARCH_PAGE = SWEEP_COUNT;
+
+function isJunkLead(lead) {
+    if (!lead || !lead.link) return false;
+    try { return isJunkDomain(lead.link); } catch (_) {}
+    return false;
+}
 
 async function fetchPlaces(query, gl) {
     return new Promise(resolve => {
@@ -16,12 +28,12 @@ async function fetchPlaces(query, gl) {
     });
 }
 
-async function searchOrganic(query, gl) {
+async function searchOrganic(query, gl, num = 20, page = SEARCH_PAGE) {
     return new Promise(resolve => {
         const req = https.request({ hostname: 'google.serper.dev', path: '/search', method: 'POST', headers: { 'X-API-KEY': API_KEY, 'Content-Type': 'application/json' } }, r => {
             let body = ''; r.on('data', c => body += c); r.on('end', () => resolve(JSON.parse(body || '{}').organic || []));
         });
-        req.on('error', () => resolve([])); req.write(JSON.stringify({ q: query, gl, num: 20 })); req.end();
+        req.on('error', () => resolve([])); req.write(JSON.stringify({ q: query, gl, num, page })); req.end();
     });
 }
 
@@ -154,8 +166,14 @@ async function run() {
     const nowIso = new Date().toISOString();
     allLeads.forEach(l => { l.source_timestamp = l.source_timestamp || nowIso; });
 
-    fs.writeFileSync(outputFile, JSON.stringify(allLeads, null, 2));
-    console.log(`[step1] Done — ${allLeads.length} raw leads written → ${outputFile}`);
+    // P0 垃圾域名过滤（与 zhimao JUNK_DOMAIN_HOSTS 单源同步）
+    const beforeFilter = allLeads.length;
+    const filtered = allLeads.filter(l => !isJunkLead(l));
+    if (beforeFilter - filtered.length > 0)
+        console.log(`[step1] Junk filter: dropped ${beforeFilter - filtered.length} leads (wiki/social/marketplace noise)`);
+
+    fs.writeFileSync(outputFile, JSON.stringify(filtered, null, 2));
+    console.log(`[step1] Done — ${filtered.length} raw leads written → ${outputFile}`);
 }
 
 run().catch(e => { console.error(e); process.exit(1); });

@@ -11,8 +11,10 @@ if (args.length < 2) {
     process.exit(1);
 }
 
-const countryCode = args[0];
-const category = args.slice(1).join(' ');
+const countryCode  = args[0];
+const category     = args.slice(1).join(' ');
+// SWEEP_COUNT 由 cron worker 传入，控制 Step1 深度翻页（第 N 次扫描取第 N 页）
+const sweepCount   = process.env.SWEEP_COUNT || '1';
 const sessionId = `v8_ultimate_${countryCode}_${Date.now()}`;
 fs.mkdirSync(sessionId, { recursive: true });
 
@@ -40,7 +42,7 @@ function runAssertedStep(stepName, scriptFile, inputFiles, outputFile, extraArgs
     console.log(`-> Executing: ${cmd}`);
 
     try {
-        execSync(cmd, { stdio: 'inherit' });
+        execSync(cmd, { stdio: 'inherit', env: { ...process.env, SWEEP_COUNT: sweepCount } });
     } catch (e) {
         console.error(`[HALT] Script crashed: ${scriptFile}. Error: ${e.message}`);
         process.exit(1);

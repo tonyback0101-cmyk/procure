@@ -1,0 +1,294 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "description": "智猫全球高壁垒数据源注册表（单源维护，供 Step1 Pillar10 + Step5 置信度加权 + 反向验证模块使用）",
+    "last_updated": "2026-05-14",
+    "maintainer": "zhimao-pm",
+    "usage": [
+      "Step1 Pillar10 读此文件生成 site: 定向搜索查询",
+      "Step5 evaluateLead 命中此表中的 domain 则 confidence_score += source_confidence_boost",
+      "v8_tax_verifier.js 读取 tax_verify_urls 做交叉校验"
+    ]
+  },
+
+  "sources": {
+    "europe_cis": [
+      {
+        "id": "seznam_cz",
+        "name": "Seznam.cz",
+        "domain": "seznam.cz",
+        "countries": ["cz"],
+        "type": "local_search_engine",
+        "intent_signals": ["LOCAL_MARKET_BUYER"],
+        "source_confidence_boost": 15,
+        "search_strategy": "site:firmy.cz OR site:seznam.cz/najdi \"${category}\" dovozce OR velkoobchod",
+        "notes": "捷克第一大本土搜索引擎，穿透英语壁垒覆盖东欧中小企业买家",
+        "data_depth": "L2",
+        "verified": true
+      },
+      {
+        "id": "rambler_ru",
+        "name": "Rambler.ru",
+        "domain": "rambler.ru",
+        "countries": ["ru"],
+        "type": "local_portal",
+        "intent_signals": ["LOCAL_MARKET_BUYER", "CIS_DISTRIBUTOR"],
+        "source_confidence_boost": 12,
+        "search_strategy": "site:rambler.ru OR site:b2b-center.ru \"${category}\" импортёр OR дистрибьютор",
+        "notes": "俄罗斯本土门户，覆盖 Google 极低权重的俄罗斯本地经销商",
+        "data_depth": "L2",
+        "verified": true
+      }
+    ],
+
+    "latam": [
+      {
+        "id": "b2bbrazil",
+        "name": "B2B Brazil",
+        "domain": "b2bbrazil.com",
+        "countries": ["br"],
+        "type": "b2b_directory",
+        "intent_signals": ["LATAM_VERIFIED_BUYER", "B2B_DIRECTORY"],
+        "source_confidence_boost": 20,
+        "search_strategy": "site:b2bbrazil.com \"${category}\" importador OR distribuidor",
+        "notes": "拉美极高权重本地 B2B 目录，买家真实性高",
+        "data_depth": "L2",
+        "verified": true
+      },
+      {
+        "id": "empresascope",
+        "name": "Empresascope",
+        "domain": "empresascope.com",
+        "countries": ["br", "mx", "co", "pe", "ar", "cl"],
+        "type": "b2b_directory",
+        "intent_signals": ["HIGH_INTENT", "WHATSAPP_DECISION_MAKER"],
+        "source_confidence_boost": 25,
+        "search_strategy": "site:empresascope.com \"${category}\"",
+        "notes": "高意图来源，标记 whatsapp_explicit，极易抓到直接决策人 WhatsApp",
+        "data_depth": "L3",
+        "verified": true,
+        "special_extract": "whatsapp_number"
+      },
+      {
+        "id": "aliceweb",
+        "name": "AliceWeb (Brazil Customs)",
+        "domain": "aliceweb.desenvolvimento.gov.br",
+        "countries": ["br"],
+        "type": "government_customs",
+        "intent_signals": ["CUSTOMS_VERIFIED", "REAL_IMPORTER"],
+        "source_confidence_boost": 35,
+        "search_strategy": "site:aliceweb.desenvolvimento.gov.br \"${category}\"",
+        "notes": "巴西外贸网，直接抓取巴西海关进出口企业数据，权威性最高",
+        "data_depth": "L3",
+        "verified": true,
+        "is_government": true
+      },
+      {
+        "id": "apas_brazil",
+        "name": "APAS (Brazil Supermarket Association)",
+        "domain": "apas.com.br",
+        "countries": ["br"],
+        "type": "trade_show",
+        "intent_signals": ["TRADE_SHOW_BUYER", "SUPERMARKET_BUYER", "HIGH_VOLUME_CONSUMER"],
+        "source_confidence_boost": 28,
+        "search_strategy": "site:apas.com.br \"${category}\" OR exhibitor OR buyer",
+        "notes": "巴西超市协会，定向抓取拉美商超参展商，成品消耗体量极大",
+        "data_depth": "L2",
+        "verified": true
+      },
+      {
+        "id": "aladi",
+        "name": "ALADI (Latin American Integration Association)",
+        "domain": "aladi.org",
+        "countries": ["br", "mx", "co", "pe", "ar", "cl", "uy", "py", "bo", "ec", "ve", "cu"],
+        "type": "regional_trade_body",
+        "intent_signals": ["TRADE_FLOW_DATA", "REGIONAL_IMPORTER"],
+        "source_confidence_boost": 18,
+        "search_strategy": "site:aladi.org \"${category}\" import OR comercio",
+        "notes": "拉美一体化协会，用于区域贸易流向分析和情报挖掘",
+        "data_depth": "L1",
+        "verified": true
+      }
+    ],
+
+    "africa": [
+      {
+        "id": "trademark_africa",
+        "name": "TradeMark Africa",
+        "domain": "trademarkafrica.com",
+        "countries": ["ke", "ug", "tz", "rw", "et", "za"],
+        "type": "trade_body",
+        "intent_signals": ["BOL_VERIFIED", "TRADE_VOLUME_DATA", "EAST_AFRICA_IMPORTER"],
+        "source_confidence_boost": 30,
+        "search_strategy": "site:trademarkafrica.com \"${category}\" import OR buyer",
+        "notes": "东非贸易数据源，带 bol/trade_volume/verified 标签，核心东非实体买家采购体量来源",
+        "data_depth": "L3",
+        "verified": true
+      },
+      {
+        "id": "saitex_africa",
+        "name": "SAITEX (South Africa International Trade Exhibition)",
+        "domain": "saitexafrica.com",
+        "countries": ["za", "bw", "na", "zw", "zm"],
+        "type": "trade_show",
+        "intent_signals": ["HIGH_INTENT", "TRADE_SHOW_BUYER", "SOUTHERN_AFRICA_DISTRIBUTOR"],
+        "source_confidence_boost": 28,
+        "search_strategy": "site:saitexafrica.com \"${category}\" OR exhibitor OR buyer",
+        "notes": "南非国际贸易展览会，寻找南部非洲分销大鳄的顶级目录",
+        "data_depth": "L2",
+        "verified": true
+      }
+    ],
+
+    "south_asia": [
+      {
+        "id": "sulekha_india",
+        "name": "Sulekha",
+        "domain": "sulekha.com",
+        "countries": ["in"],
+        "type": "local_b2b_directory",
+        "intent_signals": ["INDIA_LOCAL_BUYER", "DISTRIBUTOR_NETWORK"],
+        "source_confidence_boost": 18,
+        "search_strategy": "site:sulekha.com \"${category}\" wholesale OR distributor OR supplier",
+        "notes": "印度庞大本地 B2B 平台，本地化数据纵深远超 Indiamart，覆盖分销商/服务商网络",
+        "data_depth": "L2",
+        "verified": true
+      }
+    ],
+
+    "north_america": [
+      {
+        "id": "thomasnet",
+        "name": "ThomasNet",
+        "domain": "thomasnet.com",
+        "countries": ["us", "ca"],
+        "type": "industrial_b2b_directory",
+        "intent_signals": ["INDUSTRIAL_BUYER", "MANUFACTURING_BUYER", "HIGH_VOLUME_PROCUREMENT"],
+        "source_confidence_boost": 22,
+        "search_strategy": "site:thomasnet.com \"${category}\" buyer OR purchasing",
+        "notes": "北美最顶尖工业/机械/五金买家供应商网络，工业品采购商核心数据库",
+        "data_depth": "L3",
+        "verified": true
+      },
+      {
+        "id": "wholesale_central",
+        "name": "Wholesale Central",
+        "domain": "wholesalecentral.com",
+        "countries": ["us"],
+        "type": "b2b_directory",
+        "intent_signals": ["FBA_BUYER", "RETAIL_BUYER", "CONSUMER_ELECTRONICS_BUYER"],
+        "source_confidence_boost": 18,
+        "search_strategy": "site:wholesalecentral.com \"${category}\" buyer OR retailer",
+        "notes": "针对 FBA 卖家、零售商、3C 消费电子的货源寻址平台",
+        "data_depth": "L2",
+        "verified": true
+      },
+      {
+        "id": "manta_us",
+        "name": "Manta",
+        "domain": "manta.com",
+        "countries": ["us"],
+        "type": "sme_directory",
+        "intent_signals": ["SME_BUYER", "LOCAL_BUSINESS_BUYER"],
+        "source_confidence_boost": 14,
+        "search_strategy": "site:manta.com \"${category}\" import OR wholesale",
+        "notes": "美国中小企业目录，补充 ThomasNet 中小采购商覆盖",
+        "data_depth": "L1",
+        "verified": true
+      }
+    ]
+  },
+
+  "tax_verify_databases": {
+    "description": "官方税务/工商注册反向验证 API（Anti-fraud 核心，命中则置信度大幅提升）",
+    "databases": [
+      {
+        "id": "brazil_cnpj",
+        "country": "br",
+        "name": "Receita Federal (CNPJ)",
+        "base_url": "https://www.receitafederal.gov.br/receitafederal",
+        "lookup_url": "https://www.receitafederal.gov.br/pessoajuridica?cnpj=${id}",
+        "id_field": "CNPJ",
+        "confidence_boost_on_match": 40,
+        "notes": "巴西联邦税务局，验证公司 CNPJ 是否活跃纳税"
+      },
+      {
+        "id": "peru_ruc",
+        "country": "pe",
+        "name": "SUNAT (RUC)",
+        "lookup_url": "https://e-consultaruc.sunat.gob.pe/cl-ti-itmrconsruc/jcrS00Alias?accion=consPorRuc&nroRuc=${id}",
+        "id_field": "RUC",
+        "confidence_boost_on_match": 38,
+        "notes": "秘鲁税务局 RUC 查询"
+      },
+      {
+        "id": "colombia_nit",
+        "country": "co",
+        "name": "DIAN (NIT)",
+        "lookup_url": "https://muisca.dian.gov.co/WebRutMuisca/DefConsultarEstadoRUT.faces",
+        "id_field": "NIT",
+        "confidence_boost_on_match": 38,
+        "notes": "哥伦比亚税务局 NIT"
+      },
+      {
+        "id": "chile_rut",
+        "country": "cl",
+        "name": "SII (RUT)",
+        "lookup_url": "https://zeus.sii.cl/cvc_cgi/stc/getstc?RUT=${id}",
+        "id_field": "RUT",
+        "confidence_boost_on_match": 35,
+        "notes": "智利国税局 RUT"
+      },
+      {
+        "id": "argentina_cuit",
+        "country": "ar",
+        "name": "AFIP (CUIT)",
+        "lookup_url": "https://seti.afip.gob.ar/padron-puc-constancia-internet/ConsultaConstanciaAction.do",
+        "id_field": "CUIT",
+        "confidence_boost_on_match": 35,
+        "notes": "阿根廷联邦税务局 CUIT"
+      },
+      {
+        "id": "south_africa_cipc",
+        "country": "za",
+        "name": "CIPC (South Africa)",
+        "lookup_url": "https://www.cipc.co.za",
+        "id_field": "CompanyReg",
+        "confidence_boost_on_match": 32,
+        "notes": "南非公司与知识产权注册局"
+      },
+      {
+        "id": "nigeria_cac",
+        "country": "ng",
+        "name": "CAC Nigeria",
+        "lookup_url": "https://search.cac.gov.ng/home",
+        "id_field": "RCNumber",
+        "confidence_boost_on_match": 30,
+        "notes": "尼日利亚企业事务委员会"
+      },
+      {
+        "id": "egypt_brc",
+        "country": "eg",
+        "name": "BRC Egypt",
+        "lookup_url": "https://www.brc.gov.eg",
+        "id_field": "CommRegNo",
+        "confidence_boost_on_match": 28,
+        "notes": "埃及商业登记处"
+      }
+    ]
+  },
+
+  "source_confidence_matrix": {
+    "description": "命中不同类型数据源时的置信度加权规则（叠加，封顶 100）",
+    "rules": [
+      { "type": "government_customs",    "boost": 35, "example": "AliceWeb, SUNAT" },
+      { "type": "trade_show",            "boost": 28, "example": "SAITEX, APAS" },
+      { "type": "tax_verified",          "boost": 40, "example": "命中 CNPJ/RUC 等活跃纳税记录" },
+      { "type": "industrial_b2b_directory", "boost": 22, "example": "ThomasNet" },
+      { "type": "b2b_directory",         "boost": 18, "example": "B2B Brazil, Wholesale Central" },
+      { "type": "local_search_engine",   "boost": 15, "example": "Seznam.cz, Rambler.ru" },
+      { "type": "whatsapp_explicit",     "boost": 10, "example": "Empresascope decision-maker" },
+      { "type": "bol_cross_match",       "boost": 30, "example": "黄页公司名在 BOL/海关数据库有记录" }
+    ]
+  }
+}

@@ -1,40 +1,43 @@
 /**
- * Step 5 ??? Routing & Persistence Gateway
+ * Step 5 – Routing & Persistence Gateway
  *
- * 1. Writes hot leads (score >= 90 with contact) to local SQLite main_db
- * 2. Queues lower-score leads for future enrichment
- * 3. Pushes all leads with contact info to the Catagent API (BulkL1Item format)
+ * Tier1 (final_intent_score ≥90 + contact) → Ops 热库 (SQLite main_db + Catagent)
+ * Tier2 (final_intent_score ≥60)           → 主库 (Catagent push; contact → main_db)
+ * Tier3 (<60 + domain)                     → enrichment_queue (待二次富化)
  *
  * Required env vars:
- *   CATAGENT_API_URL   ??? e.g. https://catagent.vercel.app
- *   CATAGENT_API_KEY   ??? internal API key / CRON_SECRET
+ *   CATAGENT_API_URL  – e.g. https://catagent.vercel.app
+ *   CATAGENT_API_KEY  – internal API key / CRON_SECRET
  */
 require('dotenv').config();
 const fs       = require('fs');
 const https    = require('https');
 const Database = require('better-sqlite3');
 const crypto   = require('crypto');
+const { evaluateLead } = require('./v8_quality_gate');
 
 const [inputFile, outputFile] = process.argv.slice(2);
 
-const CATAGENT_API_URL = (process.env.CATAGENT_API_URL || '').replace(/\/$/, '');
-const CATAGENT_API_KEY = process.env.CATAGENT_API_KEY || '';
+const CATAGENT_API_URL  = (process.env.CATAGENT_API_URL || '').replace(/\/$/, '');
+const CATAGENT_API_KEY  = process.env.CATAGENT_API_KEY  || '';
+const DISCOVERY_JOB_ID  = process.env.DISCOVERY_JOB_ID  || null;
+const SKIP_SQLITE       = process.env.SKIP_SQLITE === 'true';
+const FALLBACK_PATH     = process.env.OPS_FALLBACK_PATH  || 'ops_hot_inbox_fallback.json';
+const SEED_PATH         = 'zhimao_seed_intelligence.json';
+const SEED_CONFIDENCE_MIN = Number(process.env.SEED_CONFIDENCE_MIN) || 90;
 if (!CATAGENT_API_URL) { console.error('[step5] CATAGENT_API_URL env var is required'); process.exit(1); }
 
 const leads = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
 
-// ?????? Budget estimation from knowledge base ????????????????????????????????????????????????????????????????????????????????????????????????????????????
+// ── Budget estimation from knowledge base ─────────────────────────────────
 function loadBudgetKnowledge() {
     try {
-        if (fs.existsSync('zhimao_supply_chain_economics.json')) {
+        if (fs.existsSync('zhimao_supply_chain_economics.json'))
             return JSON.parse(fs.readFileSync('zhimao_supply_chain_economics.json', 'utf8')).industries || {};
-        }
     } catch (_) {}
     return {};
 }
-
 function estimateProcurementBudget(lead, knowledge) {
-    // Match industry by entity_role or snippet keywords
     const text = `${lead.entity_role || ''} ${lead.snippet || ''}`.toLowerCase();
     for (const [, data] of Object.entries(knowledge)) {
         const bc = data.budget_calculation;
@@ -42,65 +45,102 @@ function estimateProcurementBudget(lead, knowledge) {
         const buyMatch  = (data.make_vs_buy_triggers?.buy_signals  || []).some(s => text.includes(s.toLowerCase()));
         const makeMatch = (data.make_vs_buy_triggers?.make_signals || []).some(s => text.includes(s.toLowerCase()));
         if (buyMatch || makeMatch) {
-            // Rough estimate: assume 5-50 employees (SME default) unless we have better data
             const employees    = 20;
             const annualRevUSD = employees * (bc.revenue_per_employee_usd || 100000);
-            const budgetUSD    = Math.round(annualRevUSD * (bc.procurement_ratio_of_revenue || 0.3));
-            return budgetUSD;
+            return Math.round(annualRevUSD * (bc.procurement_ratio_of_revenue || 0.3));
         }
     }
     return null;
 }
-
 const budgetKnowledge = loadBudgetKnowledge();
 
-// ?????? Local SQLite ????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????????
-const db = new Database('zhimao_v8_matrix.sqlite');
-db.exec(`CREATE TABLE IF NOT EXISTS main_db (
-    company_name TEXT UNIQUE, domain TEXT, country TEXT,
-    primary_email TEXT, primary_phone TEXT,
-    confidence_score INTEGER, entity_role TEXT, source TEXT, timestamp TEXT
-)`);
-db.exec(`CREATE TABLE IF NOT EXISTS enrichment_queue (
-    company_name TEXT UNIQUE, domain TEXT, score INTEGER, retries INTEGER DEFAULT 0
-)`);
+// ── Fallback inbox (API failure safety net) ───────────────────────────────
+function writeFallbackInbox(items, reason) {
+    if (!items?.length) return;
+    let existing = [];
+    try { if (fs.existsSync(FALLBACK_PATH)) existing = JSON.parse(fs.readFileSync(FALLBACK_PATH, 'utf8')); } catch (_) {}
+    if (!Array.isArray(existing)) existing = [];
+    const now = new Date().toISOString();
+    existing.push(...items.map(lead => ({ reason, created_at: now, discovery_job_id: DISCOVERY_JOB_ID, lead })));
+    fs.writeFileSync(FALLBACK_PATH, JSON.stringify(existing, null, 2));
+    console.warn(`[step5] fallback inbox appended: +${items.length} → ${FALLBACK_PATH} (total=${existing.length})`);
+}
 
-const insertMain  = db.prepare(`INSERT OR IGNORE INTO main_db (company_name, domain, primary_email, primary_phone, confidence_score, entity_role, source, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
-const insertQueue = db.prepare(`INSERT OR IGNORE INTO enrichment_queue (company_name, domain, score) VALUES (?, ?, ?)`);
+// ── Local SQLite ──────────────────────────────────────────────────────────
+let insertMain = null, insertQueue = null;
+if (!SKIP_SQLITE) {
+    const db = new Database('zhimao_v8_matrix.sqlite');
+    db.exec(`CREATE TABLE IF NOT EXISTS main_db (
+        company_name TEXT NOT NULL, domain TEXT, country TEXT NOT NULL DEFAULT '',
+        primary_email TEXT, primary_phone TEXT,
+        confidence_score INTEGER, entity_role TEXT, source TEXT, timestamp TEXT,
+        UNIQUE(company_name, country)
+    )`);
+    db.exec(`CREATE TABLE IF NOT EXISTS enrichment_queue (
+        company_name TEXT NOT NULL, domain TEXT, country TEXT NOT NULL DEFAULT '',
+        score INTEGER, retries INTEGER DEFAULT 0,
+        UNIQUE(company_name, country)
+    )`);
+    insertMain  = db.prepare(`INSERT OR IGNORE INTO main_db (company_name, domain, country, primary_email, primary_phone, confidence_score, entity_role, source, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    insertQueue = db.prepare(`INSERT OR IGNORE INTO enrichment_queue (company_name, domain, country, score) VALUES (?, ?, ?, ?)`);
+} else {
+    console.log('[step5] SKIP_SQLITE=true, local SQLite writes disabled.');
+}
+
+// ── Seed intelligence feed-back ───────────────────────────────────────────
+function appendToSeedIntelligence(lead, score) {
+    if (score < SEED_CONFIDENCE_MIN) return;
+    try {
+        let seeds = [];
+        if (fs.existsSync(SEED_PATH)) seeds = JSON.parse(fs.readFileSync(SEED_PATH, 'utf8'));
+        if (!Array.isArray(seeds)) seeds = [];
+        const exists = seeds.some(s => s.domain === lead.domain && s.country === lead.country);
+        if (!exists) {
+            seeds.push({ company_name: lead.company_name, domain: lead.domain, country: lead.country || '', primary_email: lead.primary_email || null, entity_role: lead.entity_role || null, inferred_bom: lead.inferred_bom || [], confidence_score: score, seeded_at: new Date().toISOString() });
+            fs.writeFileSync(SEED_PATH, JSON.stringify(seeds, null, 2));
+        }
+    } catch (_) {}
+}
 
 const validLeads = [];
 
 leads.forEach(lead => {
-    // Attach estimated procurement budget
+    // Budget estimation
     const budget = estimateProcurementBudget(lead, budgetKnowledge);
     if (budget) lead.estimated_procurement_budget_usd = budget;
 
-    // Apply temporal decay ? propagate to both score fields
+    // Temporal decay — propagate to both score fields
     const decayPenalty = applyTemporalDecay(lead);
     if (decayPenalty > 0) {
-        lead.confidence_score    = Math.max((lead.confidence_score    || 50) - decayPenalty, 1);
+        lead.confidence_score = Math.max((lead.confidence_score || 50) - decayPenalty, 1);
         if (lead.final_intent_score != null)
             lead.final_intent_score = Math.max(lead.final_intent_score - decayPenalty, 1);
         lead.decay_penalty = decayPenalty;
     }
 
-    // Canonical routing score: final_intent_score (set by Step 3) ? confidence_score fallback
+    // P0 quality gate (mirrors zhimao computeQualityGrade — no point pushing unqualified)
+    const { grade } = evaluateLead(lead);
+    if (grade === 'unqualified') return;
+
+    // Canonical routing score: final_intent_score (Step3) → confidence_score fallback
     const score      = lead.final_intent_score ?? lead.confidence_score ?? 50;
     const hasContact = !!(lead.primary_email || lead.primary_phone);
     const nowIso     = new Date().toISOString();
+    const country    = lead.country || '';
 
-    // Tier 1 ? Hot (?90 + contact): Ops ?? + Catagent
+    // Tier 1 — Hot (≥90 + contact): Ops 热库 + Catagent
     if (score >= 90 && hasContact) {
-        insertMain.run(lead.company_name, lead.domain, lead.primary_email, lead.primary_phone, score, lead.entity_role || null, lead.pillar, nowIso);
+        if (insertMain) insertMain.run(lead.company_name, lead.domain, country, lead.primary_email, lead.primary_phone, score, lead.entity_role || null, lead.pillar, nowIso);
+        appendToSeedIntelligence(lead, score);
         validLeads.push(lead);
-    // Tier 2 ? Warm (?60): ?? ? Catagent; ????????? main_db
+    // Tier 2 — Warm (≥60): 主库 → Catagent; 有联系方式则写 main_db
     } else if (score >= 60) {
         validLeads.push(lead);
-        if (lead.domain) insertQueue.run(lead.company_name, lead.domain, score);
-        if (hasContact)  insertMain.run(lead.company_name, lead.domain, lead.primary_email, lead.primary_phone, score, lead.entity_role || null, lead.pillar, nowIso);
-    // Tier 3 ? Cold (<60): ???????
+        if (insertQueue && lead.domain) insertQueue.run(lead.company_name, lead.domain, country, score);
+        if (insertMain && hasContact)   insertMain.run(lead.company_name, lead.domain, country, lead.primary_email, lead.primary_phone, score, lead.entity_role || null, lead.pillar, nowIso);
+    // Tier 3 — Cold (<60): 仅进待富化队列
     } else if (lead.domain) {
-        insertQueue.run(lead.company_name, lead.domain, score);
+        if (insertQueue) insertQueue.run(lead.company_name, lead.domain, country, score);
     }
 });
 
@@ -153,6 +193,7 @@ function mapToBulkL1Item(lead) {
         }),
         // Scoring & provenance metadata
         ...(lead.final_intent_score != null && { final_intent_score: lead.final_intent_score }),
+        ...(lead.inference_breakdown        && { inference_breakdown: lead.inference_breakdown }),
         ...(lead.source_timestamp           && { source_timestamp:   lead.source_timestamp }),
         ...(lead.decay_penalty              && { decay_penalty:      lead.decay_penalty }),
         ...(lead.intent_signal              && { intent_signal:      lead.intent_signal }),

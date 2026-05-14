@@ -236,10 +236,12 @@ async function run() {
     console.log(`>>> 选中任务: [${next.category}] @ [${next.country.name} (${next.country.gl})] [区域: ${next.region}] [Tier ${next.country.tier}]`);
     console.log(`    上次扫描: ${sweepCount === 0 ? '从未' : new Date(state[next.taskKey].last_swept).toISOString()}  累计: ${sweepCount} 次`);
 
+    // sweepCount 传给 Step1，让同一网格每次 cron 运行都取不同翻页（深度挖掘）
+    const nextSweep = (sweepCount % 5) + 1; // 1-5 循环，取 Serper 第 1-5 页
     try {
         execSync(
             `node zhimao_v8_ultimate_master.js ${next.country.gl} "${next.category}"`,
-            { stdio: 'inherit' }
+            { stdio: 'inherit', env: { ...process.env, SWEEP_COUNT: String(nextSweep) } }
         );
         // 成功后写入状态
         state[next.taskKey] = {

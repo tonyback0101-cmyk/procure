@@ -1,0 +1,70 @@
+﻿services:
+  - type: worker
+    name: zhimao-v8-discovery-worker
+    runtime: node
+    buildCommand: npm install
+    startCommand: node v8_discovery_worker.js
+    envVars:
+      # 鈹€鈹€ LLM 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+      - key: GEMINI_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: "gemini-3.1-pro-preview"
+      - key: GEMINI_FAST_MODEL
+        value: "gemini-3.1-flash-lite"
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: "gpt-5.5"
+      - key: OPENAI_FAST_MODEL
+        value: "gpt-4.1-mini"
+      # 鈹€鈹€ 鎼滅储 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+      - key: SERPER_API_KEY
+        sync: false
+      # 鈹€鈹€ 浣忓畢IP浠ｇ悊锛圔rightData锛夆攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+      - key: USE_PROXY
+        value: "true"
+      - key: BRD_USER
+        sync: false
+      - key: BRD_PASS
+        sync: false
+      - key: BRD_PROXY
+        value: "http://brd.superproxy.io:33335"
+      - key: USE_BRD_SB
+        value: "false"
+      - key: BRD_SB_WSS
+        sync: false
+      # 鈹€鈹€ Catagent / Zhimao 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+      - key: CATAGENT_API_URL
+        value: https://www.procureradar.com
+      - key: CATAGENT_API_KEY
+        sync: false
+      # 鈹€鈹€ Supabase 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # 鈹€鈹€ 杩愯妯″紡 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+      # SKIP_SQLITE=true锛歊ender 榛樿鐢?ephemeral 鏂囦欢绯荤粺锛孲QLite 閲嶅惎鍚庢竻闆躲€?      # 鍥犳 enrichment_queue / main_db 鍦ㄧ敓浜х幆澧冩棤鎸佷箙鍖栦环鍊笺€?      # 鑻ヨ鍚敤鏈湴 SQLite锛堟寕杞芥寔涔呭嵎鍦烘櫙锛夛紝鏀逛负 false 骞舵寕杞?/data 鍗凤紝
+      # 鍚屾椂鎶?v8_enrichment_queue_worker.js 娉ㄥ唽涓虹嫭绔?worker 鏈嶅姟銆?      - key: SKIP_SQLITE
+        value: "true"
+      - key: PLAYWRIGHT_TIMEOUT
+        value: "12000"
+      - key: STEP3_PAGE_CONCURRENCY
+        value: "8"
+      # 鈹€鈹€ enrichment_queue 閰嶇疆锛堜粎鍦?SKIP_SQLITE=false 鏃剁敓鏁堬級鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+      - key: ENRICH_QUEUE_BATCH_SIZE
+        value: "30"
+      - key: ENRICH_QUEUE_MAX_RETRIES
+        value: "5"
+      - key: ENRICH_PROMOTE_SCORE
+        value: "70"
+      # 鈹€鈹€ 绋庡彿/宸ュ晢娉ㄥ唽鍙嶅悜楠岃瘉锛堝叧闂?浠呰娉ㄥ唽琛ㄥ仛缃俊搴﹀姞鏉冿紝寮€鍚?涓诲姩 HTTP 楠岃瘉锛夆攢鈹€
+      # 寮€鍚悗 Step3.5 浼氬鎷夌編/闈炴床鍏徃閫愪竴鏌ヨ CNPJ/RUC/NIT 绛夊畼鏂规暟鎹簱
+      # 娉ㄦ剰锛氱◣鍔＄郴缁熸煡璇㈡湁棰戠巼闄愬埗锛孋ONCURRENCY 涓嶅疁瓒呰繃 3
+      - key: TAX_VERIFY_ENABLED
+        value: "false"
+      - key: TAX_VERIFY_CONCURRENCY
+        value: "3"
+      - key: TAX_VERIFY_TIMEOUT_MS
+        value: "5000"
