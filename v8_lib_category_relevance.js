@@ -20,12 +20,13 @@ const { sanitizeDiscoveryCategory } = require('./v8_lib_category_sanitize');
 const VERTICAL_FAMILIES = {
   produce_food: {
     categoryHints: [
-      /白菜|草莓|蔬菜|水果|海鲜|水产|大米|面粉|食品|蔬果|榴莲|土豆|马铃薯|肉|禽|蛋|奶|茶|酒|饮料|粮油|调味/,
-      /\b(cabbage|strawberry|seafood|vegetable|fruit|produce|food|rice|flour|durian|potato|meat|poultry|dairy|beverage|grocery|fresh\s+produce)\b/i,
+      /白菜|黄瓜|青瓜|草莓|蔬菜|水果|海鲜|水产|大米|面粉|食品|蔬果|榴莲|土豆|马铃薯|肉|禽|蛋|奶|茶|酒|饮料|粮油|调味/,
+      /\b(cabbage|cucumber|seafood|vegetable|fruit|produce|food|rice|flour|durian|potato|meat|poultry|dairy|beverage|grocery|fresh\s+produce)\b/i,
     ],
     leadMarkers: [
-      /\b(vegetable|fruit|produce|seafood|food\s+(supply|wholesale|trading|import)|wet\s+market|grocery|bok\s+choy|cabbage|strawberry)\b/i,
-      /蔬|果|海鲜|水产|白菜|草莓|粮油|食品批发|食品供应/,
+      /\b(vegetable|fruit|produce|seafood|food\s+(supply|wholesale|trading|import)|wet\s+market|grocery|bok\s+choy|cabbage|cucumber|strawberry)\b/i,
+      // 黄瓜(?!条)：避免「黄瓜条」牛肉部位误判为蔬果
+      /蔬|果|海鲜|水产|白菜|黄瓜(?!条)|青瓜|草莓|粮油|食品批发|食品供应|生鲜/,
     ],
   },
   auto: {
@@ -118,16 +119,48 @@ function categoryTokens(category) {
 }
 
 /**
+ * 中文品类假友：子串命中但语义不是该品类（如「黄瓜条」= 牛肉部位，非蔬菜黄瓜）
+ * key = 用户品类（净化后），value = 命中则不算品类相关的正则
+ */
+const CATEGORY_FALSE_FRIENDS = {
+  黄瓜: /黄瓜条/,
+  cucumber: /\bcucumber\s*strip\b|\bcucumber\s*cut\b/i,
+};
+
+function isFalseFriendMention(text, category) {
+  const cat = String(category || '').trim().toLowerCase();
+  if (!cat) return false;
+  const t = String(text || '');
+  const re = CATEGORY_FALSE_FRIENDS[cat] || CATEGORY_FALSE_FRIENDS[String(category || '').trim()];
+  if (re && re.test(t)) {
+    // 假友命中且无独立蔬果语境 → 视为假命中
+    if (!/\b(vegetable|produce|fresh\s+veg|蔬|青瓜|freshveggies|wholesale\s+cucumber)\b/i.test(t)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
  * 线索文本是否已含用户品类词（强相关 → 不可因垂直错配丢掉）
  */
 function textMentionsCategory(text, category) {
   const t = String(text || '').toLowerCase();
   const cat = String(category || '').toLowerCase().trim();
   if (!t || !cat) return false;
+  if (isFalseFriendMention(text, category) || isFalseFriendMention(text, cat)) return false;
   if (t.includes(cat)) return true;
   const tokens = categoryTokens(cat);
   // 至少命中一个长度≥2 的 token，或唯一短中文品类整词
-  return tokens.some((tok) => tok.length >= 2 && t.includes(tok.toLowerCase()));
+  return tokens.some((tok) => {
+    if (tok.length < 2) return false;
+    if (!t.includes(tok.toLowerCase())) return false;
+    // token 级假友：黄瓜 ⊂ 黄瓜条
+    if (tok === '黄瓜' && /黄瓜条/.test(String(text || '')) && !/青瓜|蔬菜|蔬果|fresh\s*veg/i.test(t)) {
+      return false;
+    }
+    return true;
+  });
 }
 
 /**
@@ -176,6 +209,7 @@ module.exports = {
   detectFamilies,
   categoryTokens,
   textMentionsCategory,
+  isFalseFriendMention,
   offCategoryReason,
   categoryRelevanceScore,
 };

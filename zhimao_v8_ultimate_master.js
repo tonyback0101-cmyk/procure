@@ -241,7 +241,7 @@ let overflowLeads = [];
 if (!gracefulCancel && fs.existsSync(fileBus.t2_intake)) {
     try {
         const intakeAll = JSON.parse(fs.readFileSync(fileBus.t2_intake, 'utf8'));
-        const { top, overflow, total, hardRejected, hardReasons } = splitEnrichTopN(
+        const { top, overflow, total, hardRejected, hardReasons, relevanceFloor, relevanceFilled } = splitEnrichTopN(
           intakeAll,
           ENRICH_TOP_N,
           process.env.DISCOVERY_CATEGORY || category,
@@ -253,10 +253,15 @@ if (!gracefulCancel && fs.existsSync(fileBus.t2_intake)) {
         const hardNote = hardRejected
           ? `, hard_noise_rejected=${hardRejected}${hardReasons ? `(${Object.entries(hardReasons).map(([k, v]) => `${k}:${v}`).join(',')})` : ''}`
           : '';
+        const floorNote =
+          relevanceFloor > 0
+            ? `, relevance_floor=${relevanceFilled}/${relevanceFloor}`
+            : '';
         console.log(
             `[master] enrich cap: intake=${total} → top=${top.length} for Step3` +
             (overflowLeads.length ? `, overflow=${overflowLeads.length} deferred (display later)` : '') +
             hardNote +
+            floorNote +
             ` (ENRICH_TOP_N=${ENRICH_TOP_N})`,
         );
         const jobId = process.env.DISCOVERY_JOB_ID || '';
@@ -268,6 +273,8 @@ if (!gracefulCancel && fs.existsSync(fileBus.t2_intake)) {
                 overflow_count: overflowLeads.length,
                 hard_noise_rejected: hardRejected || 0,
                 hard_noise_reasons: hardReasons || {},
+                relevance_floor: relevanceFloor || 0,
+                relevance_filled: relevanceFilled || 0,
             });
         }
     } catch (e) {

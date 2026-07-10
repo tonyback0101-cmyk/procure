@@ -482,6 +482,11 @@ const PLATFORM_HOSTS = [
     'reddit.com', 'quora.com',
     'wikipedia.org', 'wikihow.com', 'youtube.com',
     'facebook.com', 'instagram.com', 'linkedin.com', 'x.com', 'twitter.com', 'tiktok.com',
+    // 电商/外卖/内容平台（非 B2B 买家官网）
+    'taobao.com', 'tmall.com', 'jd.com', 'pinduoduo.com',
+    'foodpanda.sg', 'foodpanda.com', 'grab.com', 'deliveroo.com', 'grubhub.com',
+    'lemon8-app.com', 'huggingface.co', 'ebay.com', 'ebay.com.sg',
+    'tridge.com', 'carousell.com', 'shopee.sg', 'shopee.com',
 ];
 const CN_HINT_RE = /\b(china|chinese|guangzhou|shenzhen|yiwu|shanghai|ningbo|hk\b|hong\s*kong)\b/i;
 
