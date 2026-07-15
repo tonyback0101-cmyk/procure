@@ -70,11 +70,14 @@ const LANGUAGE_MAP  = {
 };
 
 async function run() {
-    const cc = String(countryCode || '').trim().slice(0, 2).toLowerCase() || 'us';
-    const isoUpper = cc.toUpperCase();
-    const targetLang  = LANGUAGE_MAP[cc]  || 'English';
-    const countryName = COUNTRY_NAMES[cc] || isoUpper;
-    const tld         = `site:.${cc} OR site:.com.${cc}`;
+    // 无国家门槛根治（2026-07，双仓镜像 zhimao GLOBAL 哨兵）：GLOBAL = 内贸/全域搜索。
+    // 不做 tld 站点限制、不拼国家名后缀、gl 交给 Serper 默认（英文层召回国际买家）。
+    const isGlobal = String(countryCode || '').trim().toUpperCase() === 'GLOBAL';
+    const cc = isGlobal ? '' : (String(countryCode || '').trim().slice(0, 2).toLowerCase() || 'us');
+    const isoUpper = isGlobal ? 'GLOBAL' : cc.toUpperCase();
+    const targetLang  = isGlobal ? 'English' : (LANGUAGE_MAP[cc]  || 'English');
+    const countryName = isGlobal ? '' : (COUNTRY_NAMES[cc] || isoUpper);
+    const tld         = isGlobal ? '' : `site:.${cc} OR site:.com.${cc}`;
 
     /**
      * 品类词净化：口语查询 + 买家后缀 + 国家前缀。

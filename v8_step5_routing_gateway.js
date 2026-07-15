@@ -149,6 +149,9 @@ const icpStats = { high: 0, medium: 0, low: 0, none: 0, unset: 0 };
 // 用户搜索目标国不一致仍然写入。这里做兜底过滤：跨国结果直接降级为 unqualified，
 // 不写入 L1（用户搜 MY 看到 CN 公司是核心错乱体验）。
 const TARGET_COUNTRY_ISO = String(process.env.DISCOVERY_COUNTRY_ISO || '').toUpperCase();
+// 无国家门槛根治（2026-07，双仓镜像 zhimao buildRefreshCandidates GLOBAL 哨兵）：
+// GLOBAL 任务是内贸/全域搜索，不该按目标国裁跨国结果——否则每条 leadCountry!==GLOBAL 全被丢。
+const IS_GLOBAL_JOB = TARGET_COUNTRY_ISO === 'GLOBAL' || TARGET_COUNTRY_ISO === '';
 
 // ── 业态画像树工程：反向验证闸门 ─────────────────────────────────────────────
 // step3 L3 prompt 已在 DISCOVERY_CATEGORY 注入时输出 target_category_match：
@@ -189,7 +192,8 @@ const validLeads = leads
 
     // 跨国校验：lead.country 与本次 job 目标国不一致 → 降级丢弃
     // 例外：seed/HVC 类来源（pillar 0）是种子库反哺，允许跨国
-    if (TARGET_COUNTRY_ISO && leadCountry !== TARGET_COUNTRY_ISO) {
+    // GLOBAL 任务（无国家门槛）跳过此校验：任意国家的买家都保留。
+    if (!IS_GLOBAL_JOB && TARGET_COUNTRY_ISO && leadCountry !== TARGET_COUNTRY_ISO) {
       const isSeedSource = String(lead.pillar || '').match(/Pillar 0|Seed/i) || lead.verified_source_id;
       if (!isSeedSource) {
         lead._quality_grade = 'unqualified';

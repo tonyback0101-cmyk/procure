@@ -375,7 +375,9 @@ async function run() {
   // categoryClean 由 step0 净化；再与 PILLAR0 兜底净化保持单源语义
   const { baseQuery, countryName, tld } = data;
   const category = data.categoryClean || sanitizeDiscoveryCategory(data.category || '');
-  const cc   = countryCode || '';
+  // 无国家门槛根治（2026-07）：GLOBAL 哨兵 → gl 置空，Serper 走全域检索（不做单国偏置）。
+  // countryName 已由 step0 在 GLOBAL 时置空，各 pillar query 自然不拼国家后缀。
+  const cc   = (countryCode && String(countryCode).toUpperCase() !== 'GLOBAL') ? countryCode : '';
   const year = new Date().getFullYear();
   const controls = loadReweightControls();
   const convo = readConvoControlsFromEnv();
